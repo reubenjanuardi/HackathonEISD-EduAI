@@ -1,31 +1,30 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import Input from '../components/Input';
 import Button from '../components/Button';
 import { useToast } from '../components/Toast';
-import { login } from '../services/api';
+import { useAuthStore } from '../stores';
 
 const Login = () => {
-  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const { addToast } = useToast();
+  const { signIn, loading, error } = useAuthStore();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setLoading(true);
 
-    try {
-      const data = await login(username, password);
-      localStorage.setItem('token', data.token);
-      localStorage.setItem('user', JSON.stringify(data.user));
+    const success = await signIn(email, password);
+    
+    if (success) {
       addToast('Login successful!', 'success');
-      navigate('/dashboard');
-    } catch (error) {
-      addToast(error.response?.data?.message || 'Login failed', 'error');
-    } finally {
-      setLoading(false);
+      // Get user role to redirect appropriately
+      const { user, profile } = useAuthStore.getState();
+      const role = profile?.role || 'student';
+      navigate(role === 'teacher' ? '/teacher/dashboard' : '/student/dashboard');
+    } else {
+      addToast(error || 'Login failed', 'error');
     }
   };
 
@@ -47,11 +46,11 @@ const Login = () => {
         <div className="card">
           <form onSubmit={handleSubmit} className="space-y-4">
             <Input
-              label="Username"
-              type="text"
-              placeholder="Enter your username"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
+              label="Email"
+              type="email"
+              placeholder="Enter your email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
               required
             />
             
@@ -64,6 +63,12 @@ const Login = () => {
               required
             />
 
+            {error && (
+              <div className="p-3 bg-red-500/20 border border-red-500/50 rounded-lg">
+                <p className="text-sm text-red-400">{error}</p>
+              </div>
+            )}
+
             <Button
               type="submit"
               variant="primary"
@@ -74,10 +79,13 @@ const Login = () => {
             </Button>
           </form>
 
-          <div className="mt-6 p-4 bg-neutral-700/50 rounded-lg">
-            <p className="text-sm text-neutral-300 mb-2 font-medium">Demo Credentials:</p>
-            <p className="text-xs text-neutral-400">Username: <span className="text-accent">teacher</span></p>
-            <p className="text-xs text-neutral-400">Password: <span className="text-accent">password123</span></p>
+          <div className="mt-6 text-center">
+            <p className="text-neutral-400 text-sm">
+              Don't have an account?{' '}
+              <Link to="/signup" className="text-primary hover:text-primary/80 font-medium">
+                Sign up
+              </Link>
+            </p>
           </div>
         </div>
 
