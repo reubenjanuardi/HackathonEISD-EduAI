@@ -86,9 +86,9 @@ const startServer = async () => {
     console.log(`📍 Health check: http://localhost:${PORT}/api/health`);
     console.log(`🔗 API Base URL: http://localhost:${PORT}/api`);
     
-    if (!process.env.GEMINI_API_KEY || process.env.GEMINI_API_KEY === 'your_gemini_api_key_here') {
-      console.log('\n⚠️  WARNING: Gemini API key not configured!');
-      console.log('💡 Set GEMINI_API_KEY in your .env file to enable AI features');
+    if (!process.env.AIML_API_KEY || process.env.AIML_API_KEY === 'your_aiml_api_key_here') {
+      console.log('\n⚠️  WARNING: AI/ML API key not configured!');
+      console.log('💡 Get your free API key at https://aimlapi.com/ and add it to your .env file');
     }
     
     console.log('\n📚 Available endpoints:');

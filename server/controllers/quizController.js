@@ -1,11 +1,9 @@
 import QuizResult from '../models/QuizResult.js';
-import { 
-  getQuestionByDifficulty, 
-  getNextDifficulty, 
-  calculateScore 
-} from '../services/quizService.js';
+import quizService from '../services/quizService.js';
 import { generateRecommendations } from '../services/aiService.js';
 import { v4 as uuidv4 } from 'uuid';
+
+const { getQuestionByDifficulty, getNextDifficulty, calculateScore, questionBank } = quizService;
 
 // In-memory storage for active quiz sessions (in production, use Redis or DB)
 const activeSessions = new Map();
@@ -70,7 +68,6 @@ export const submitAnswer = async (req, res) => {
     }
     
     // Find the question to check if answer is correct
-    const { questionBank } = await import('../services/quizService.js');
     const question = questionBank.find(q => q.id === questionId);
     
     if (!question) {

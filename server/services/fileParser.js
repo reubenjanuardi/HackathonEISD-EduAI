@@ -24,10 +24,14 @@ export const parseCSV = (filePath) => {
         results.push(grade);
       })
       .on('end', () => {
-        resolve(results);
+        if (results.length === 0) {
+          reject(new Error('CSV file is empty or has no valid data rows'));
+        } else {
+          resolve(results);
+        }
       })
       .on('error', (error) => {
-        reject(error);
+        reject(new Error(`Failed to parse CSV file: ${error.message}`));
       });
   });
 };
@@ -41,8 +45,17 @@ export const parseExcel = (filePath) => {
   try {
     const workbook = xlsx.readFile(filePath);
     const sheetName = workbook.SheetNames[0];
+    
+    if (!sheetName) {
+      throw new Error('Excel file has no sheets');
+    }
+    
     const sheet = workbook.Sheets[sheetName];
     const data = xlsx.utils.sheet_to_json(sheet);
+    
+    if (!data || data.length === 0) {
+      throw new Error('Excel sheet is empty or has no data rows');
+    }
     
     // Normalize the data structure
     const results = data.map(row => ({
@@ -54,7 +67,7 @@ export const parseExcel = (filePath) => {
     
     return results;
   } catch (error) {
-    throw new Error('Failed to parse Excel file');
+    throw new Error(`Failed to parse Excel file: ${error.message}`);
   }
 };
 
@@ -68,11 +81,25 @@ export const validateGradeData = (data) => {
     return false;
   }
   
-  return data.every(row => 
-    row.name && 
-    row.subject && 
-    typeof row.grade === 'number' && 
-    row.grade >= 0 && 
-    row.grade <= 100
-  );
+  return data.every(row => {
+    // Check required fields
+    if (!row.name || !row.subject) {
+      return false;
+    }
+    
+    // Validate grade is a number between 0-100
+    const gradeNum = typeof row.grade === 'string' 
+      ? parseFloat(row.grade) 
+      : row.grade;
+    
+    if (typeof gradeNum !== 'number' || isNaN(gradeNum)) {
+      return false;
+    }
+    
+    if (gradeNum < 0 || gradeNum > 100) {
+      return false;
+    }
+    
+    return true;
+  });
 };

@@ -1,7 +1,7 @@
 import mongoose from 'mongoose';
 
 const gradeSchema = new mongoose.Schema({
-  studentName: {
+  name: {
     type: String,
     required: true,
   },
@@ -26,8 +26,6 @@ const gradeSchema = new mongoose.Schema({
   insights: {
     type: String,
   },
-}, {
-  timestamps: true,
 });
 
 export default mongoose.model('Grade', gradeSchema);

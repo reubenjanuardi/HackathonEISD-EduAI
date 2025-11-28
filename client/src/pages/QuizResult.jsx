@@ -108,7 +108,7 @@ const QuizResult = () => {
               <div>
                 <p className="text-sm font-medium text-primary">Personalized by AI</p>
                 <p className="text-xs text-neutral-400 mt-1">
-                  These recommendations are generated based on your quiz performance using Google Gemini AI.
+                  These recommendations are generated based on your quiz performance using AI/ML API.
                 </p>
               </div>
             </div>

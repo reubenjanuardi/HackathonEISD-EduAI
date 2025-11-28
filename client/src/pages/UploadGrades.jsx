@@ -192,7 +192,7 @@ const UploadGrades = () => {
                 </svg>
                 <div>
                   <p className="text-sm font-medium text-accent">AI-Powered Analysis</p>
-                  <p className="text-xs text-neutral-400 mt-1">These insights were generated using Google Gemini AI to help you make data-driven decisions.</p>
+                  <p className="text-xs text-neutral-400 mt-1">These insights were generated using AI/ML API to help you make data-driven decisions.</p>
                 </div>
               </div>
             </div>

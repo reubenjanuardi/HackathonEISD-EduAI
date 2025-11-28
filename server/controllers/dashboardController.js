@@ -7,10 +7,10 @@ import QuizResult from '../models/QuizResult.js';
 export const getDashboard = async (req, res) => {
   try {
     // Get all grades
-    const allGrades = await Grade.find().sort({ createdAt: -1 }).limit(100);
+    const allGrades = await Grade.find().sort({ date: -1 }).limit(100);
     
     // Calculate statistics
-    const totalStudents = new Set(allGrades.map(g => g.studentName)).size;
+    const totalStudents = new Set(allGrades.map(g => g.name)).size;
     const averageGrade = allGrades.length > 0
       ? (allGrades.reduce((sum, g) => sum + g.grade, 0) / allGrades.length).toFixed(2)
       : 0;
@@ -48,7 +48,7 @@ export const getDashboard = async (req, res) => {
     
     // Recent students
     const recentStudents = allGrades.slice(0, 10).map(g => ({
-      name: g.studentName,
+      name: g.name,
       subject: g.subject,
       grade: g.grade,
       date: new Date(g.date).toLocaleDateString(),
