@@ -1,16 +1,19 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
-import mongoose from 'mongoose';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
-// Routes
+// Routes - Supabase based
 import authRoutes from './routes/authRoutes.js';
-import gradeRoutes from './routes/gradeRoutes.js';
+import classRoutes from './routes/classRoutes.js';
+import materialRoutes from './routes/materialRoutes.js';
 import quizRoutes from './routes/quizRoutes.js';
-import dashboardRoutes from './routes/dashboardRoutes.js';
+import attemptRoutes from './routes/attemptRoutes.js';
+import analyticsRoutes from './routes/analyticsRoutes.js';
+import aiRoutes from './routes/aiRoutes.js';
+import exportRoutes from './routes/exportRoutes.js';
 
 // Get __dirname equivalent in ES modules
 const __filename = fileURLToPath(import.meta.url);
@@ -40,20 +43,24 @@ app.use(cors({
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Routes
-app.use('/api/auth', authRoutes);
-app.use('/api/grades', gradeRoutes);
-app.use('/api/quiz', quizRoutes);
-app.use('/api/dashboard', dashboardRoutes);
-
-// Health check endpoint
+// Health check endpoint (no auth required)
 app.get('/api/health', (req, res) => {
   res.json({ 
     status: 'OK', 
-    message: 'EduAI Server is running',
+    message: 'EduAI Server is running (Supabase)',
     timestamp: new Date().toISOString(),
   });
 });
+
+// Routes
+app.use('/api/auth', authRoutes);
+app.use('/api/classes', classRoutes);
+app.use('/api/materials', materialRoutes);
+app.use('/api/quizzes', quizRoutes);
+app.use('/api/attempts', attemptRoutes);
+app.use('/api/analytics', analyticsRoutes);
+app.use('/api/ai', aiRoutes);
+app.use('/api/export', exportRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {
@@ -64,41 +71,32 @@ app.use((err, req, res, next) => {
   });
 });
 
-// MongoDB Connection
-const connectDB = async () => {
-  try {
-    const mongoURI = process.env.MONGODB_URI || 'mongodb://localhost:27017/eduai';
-    await mongoose.connect(mongoURI);
-    console.log('✅ MongoDB Connected');
-  } catch (error) {
-    console.error('❌ MongoDB Connection Error:', error.message);
-    console.log('⚠️  Server will continue running, but database features will not work.');
-    console.log('💡 To fix: Install MongoDB locally or use MongoDB Atlas');
-  }
-};
-
 // Start server
 const startServer = async () => {
-  await connectDB();
-  
   app.listen(PORT, () => {
     console.log(`\n🚀 EduAI Server running on port ${PORT}`);
     console.log(`📍 Health check: http://localhost:${PORT}/api/health`);
     console.log(`🔗 API Base URL: http://localhost:${PORT}/api`);
+    
+    if (!process.env.SUPABASE_URL || !process.env.SUPABASE_ANON_KEY) {
+      console.log('\n⚠️  WARNING: Supabase credentials not configured!');
+      console.log('💡 Add SUPABASE_URL and SUPABASE_ANON_KEY to your .env file');
+    }
     
     if (!process.env.AIML_API_KEY || process.env.AIML_API_KEY === 'your_aiml_api_key_here') {
       console.log('\n⚠️  WARNING: AI/ML API key not configured!');
       console.log('💡 Get your free API key at https://aimlapi.com/ and add it to your .env file');
     }
     
-    console.log('\n📚 Available endpoints:');
-    console.log('   POST /api/auth/login');
-    console.log('   GET  /api/dashboard');
-    console.log('   POST /api/grades/upload');
-    console.log('   POST /api/grades/insights');
-    console.log('   GET  /api/quiz/start');
-    console.log('   POST /api/quiz/answer');
-    console.log('   GET  /api/quiz/result/:id\n');
+    console.log('\n📚 Available API Groups:');
+    console.log('   🔐 /api/auth          - Authentication & profile');
+    console.log('   📚 /api/classes       - Class management & enrollment');
+    console.log('   📄 /api/materials     - Upload & manage course materials');
+    console.log('   ❓ /api/quizzes      - Quiz CRUD operations');
+    console.log('   ✅ /api/attempts     - Quiz attempts & submissions');
+    console.log('   📊 /api/analytics    - Class & quiz analytics');
+    console.log('   🤖 /api/ai           - AI features (quiz generation, summarization)');
+    console.log('   📥 /api/export       - Export grades & reports\n');
   });
 };
 
