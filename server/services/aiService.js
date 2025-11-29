@@ -342,6 +342,15 @@ class AIService {
    */
   static async generateAdaptiveQuiz(classId, studentId, topicId) {
     try {
+      // Get the class to find the teacher
+      const { data: classData, error: classError } = await supabase
+        .from('classes')
+        .select('teacher_id')
+        .eq('id', classId)
+        .single();
+
+      if (classError) throw new Error(`Class query error: ${classError.message}`);
+
       // Get student's recent performance on topic
       const { data: progress, error: pError } = await supabase
         .from('student_progress')
@@ -350,14 +359,14 @@ class AIService {
         .eq('class_id', classId)
         .single();
 
-      if (pError) throw new Error(`Progress query error: ${pError.message}`);
-
-      // Determine difficulty based on performance
+      // If no progress record exists, use default medium difficulty
       let difficulty = 'medium';
-      if (progress.average_score > 80) {
-        difficulty = 'hard';
-      } else if (progress.average_score < 60) {
-        difficulty = 'easy';
+      if (!pError && progress) {
+        if (progress.average_score > 80) {
+          difficulty = 'hard';
+        } else if (progress.average_score < 60) {
+          difficulty = 'easy';
+        }
       }
 
       // Generate quiz
@@ -365,7 +374,7 @@ class AIService {
         .from('quizzes')
         .insert({
           class_id: classId,
-          created_by: progress.teacher_id || studentId, // Use teacher_id from progress or student
+          created_by: classData.teacher_id,
           title: `Adaptive Quiz - ${topicId}`,
           description: `Adaptive quiz generated based on your performance`,
           published: false,
@@ -437,7 +446,7 @@ class AIService {
         quiz,
         questions,
         adaptiveDifficulty: difficulty,
-        studentPerformance: progress.average_score,
+        studentPerformance: progress?.average_score || null,
       };
     } catch (error) {
       console.error('Generate adaptive quiz error:', error);

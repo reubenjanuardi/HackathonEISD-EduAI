@@ -107,7 +107,7 @@ class ClassService {
       .eq('status', 'active');
 
     if (membersError) {
-      console.warn('Failed to fetch class members:', membersError.message);
+      console.error('Failed to fetch class members:', membersError.message);
     }
 
     // Get user details for each member
@@ -120,7 +120,7 @@ class ClassService {
         .in('id', studentIds);
 
       if (usersError) {
-        console.warn('Failed to fetch user details:', usersError.message);
+        console.error('Failed to fetch user details:', usersError.message);
       }
 
       // Create a map for quick lookup
@@ -134,7 +134,7 @@ class ClassService {
           student_id: member.student_id,
           enrolled_at: member.joined_at,
           status: member.status,
-          profiles: user || { id: member.student_id, name: 'Unknown', email: '' }
+          profiles: user || { id: member.student_id, name: 'User Not Found', email: '' }
         });
       }
     }
