@@ -1,14 +1,19 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import Card from '../../components/Card';
+import Button from '../../components/Button';
 import Chart from '../../components/Chart';
 import Navbar from '../../components/Navbar';
-import { useAuthStore } from '../../stores';
-import { getStudentProgress } from '../../services/api';
+import { useAuthStore, useClassStore } from '../../stores';
+import { getStudentProgress, getAIRecommendations } from '../../services/api';
 
 const StudentProgress = () => {
   const { profile } = useAuthStore();
+  const { classes } = useClassStore();
   const [progress, setProgress] = useState(null);
+  const [recommendations, setRecommendations] = useState(null);
+  const [recommendationsLoading, setRecommendationsLoading] = useState(false);
+  const [selectedClassId, setSelectedClassId] = useState('');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -24,6 +29,19 @@ const StudentProgress = () => {
       console.error('Error loading progress:', err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadRecommendations = async (classId) => {
+    if (!classId) return;
+    setRecommendationsLoading(true);
+    try {
+      const data = await getAIRecommendations(classId);
+      setRecommendations(data);
+    } catch (err) {
+      console.error('Error loading recommendations:', err);
+    } finally {
+      setRecommendationsLoading(false);
     }
   };
 
@@ -238,6 +256,94 @@ const StudentProgress = () => {
                   🏠 Dashboard
                 </Link>
               </div>
+            </Card>
+
+            {/* AI Recommendations */}
+            <Card className="bg-gradient-to-br from-purple-500/10 to-indigo-500/10 border-purple-500/20">
+              <div className="flex items-center gap-2 mb-4">
+                <svg className="w-5 h-5 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                </svg>
+                <h3 className="text-lg font-semibold text-white">AI Recommendations</h3>
+              </div>
+              
+              {classes && classes.length > 0 ? (
+                <div className="space-y-3">
+                  <select
+                    className="w-full px-3 py-2 bg-neutral-700 border border-neutral-600 rounded-lg text-white text-sm focus:outline-none focus:border-purple-500"
+                    value={selectedClassId}
+                    onChange={(e) => {
+                      setSelectedClassId(e.target.value);
+                      setRecommendations(null);
+                    }}
+                  >
+                    <option value="">Select a class...</option>
+                    {classes.map((cls) => (
+                      <option key={cls.id || cls.classes?.id} value={cls.id || cls.classes?.id}>
+                        {cls.name || cls.classes?.name}
+                      </option>
+                    ))}
+                  </select>
+
+                  {selectedClassId && !recommendations && (
+                    <Button 
+                      variant="secondary" 
+                      className="w-full" 
+                      onClick={() => loadRecommendations(selectedClassId)}
+                      loading={recommendationsLoading}
+                    >
+                      Get AI Recommendations
+                    </Button>
+                  )}
+
+                  {recommendationsLoading && (
+                    <div className="text-center py-4">
+                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-purple-500 mx-auto"></div>
+                      <p className="text-neutral-400 text-sm mt-2">Analyzing...</p>
+                    </div>
+                  )}
+
+                  {recommendations && recommendations.data && (
+                    <div className="space-y-3">
+                      {recommendations.data.performanceMetrics && (
+                        <div className="p-3 bg-neutral-800/50 rounded-lg">
+                          <div className="text-sm text-neutral-400 mb-1">Your Average Score</div>
+                          <div className={`text-xl font-bold ${
+                            recommendations.data.performanceMetrics.averageScore >= 70 ? 'text-green-400' :
+                            recommendations.data.performanceMetrics.averageScore >= 50 ? 'text-yellow-400' :
+                            'text-red-400'
+                          }`}>
+                            {recommendations.data.performanceMetrics.averageScore || 0}%
+                          </div>
+                          {recommendations.data.performanceMetrics.attemptCount > 0 && (
+                            <div className="text-xs text-neutral-500 mt-1">
+                              Based on {recommendations.data.performanceMetrics.attemptCount} quiz attempt(s)
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      
+                      <div className="p-3 bg-purple-500/10 rounded-lg border border-purple-500/20">
+                        <div className="text-sm text-neutral-300 whitespace-pre-wrap leading-relaxed">
+                          {recommendations.data.recommendations || 'Take some quizzes to get personalized recommendations!'}
+                        </div>
+                      </div>
+
+                      <Button 
+                        variant="secondary" 
+                        className="w-full text-sm" 
+                        onClick={() => loadRecommendations(selectedClassId)}
+                      >
+                        🔄 Refresh Recommendations
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <p className="text-neutral-500 text-sm">
+                  Enroll in classes to get personalized AI recommendations.
+                </p>
+              )}
             </Card>
           </div>
         </div>
