@@ -167,7 +167,7 @@ const StudentDashboard = () => {
                   {upcomingQuizzes.slice(0, 3).map((quiz) => (
                     <Link 
                       key={quiz.id} 
-                      to={`/student/quiz/${quiz.id}`}
+                      to={`/student/class/${quiz.class_id || quiz.classId}/quiz/${quiz.id}`}
                       className="block p-3 bg-neutral-700/50 rounded-lg hover:bg-neutral-700 transition-colors"
                     >
                       <h4 className="text-white font-medium">{quiz.title}</h4>

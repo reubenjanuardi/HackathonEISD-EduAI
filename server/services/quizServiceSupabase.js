@@ -57,7 +57,12 @@ class QuizServiceSupabase {
       is_published: quiz.published,
       time_limit: quiz.time_limit || 30,
       is_adaptive: quiz.is_adaptive || false,
-      questions: quiz.quiz_questions || []
+      questions: (quiz.quiz_questions || []).map(q => ({
+        ...q,
+        question_text: q.question,
+        question_type: q.question_type || 'multiple_choice',
+        points: 10
+      }))
     }));
   }
 
@@ -92,7 +97,7 @@ class QuizServiceSupabase {
       questions: (data.quiz_questions || []).map(q => ({
         ...q,
         question_text: q.question,
-        question_type: 'multiple_choice', // Default type
+        question_type: q.question_type || 'multiple_choice',
         points: 10 // Default points
       }))
     };
@@ -101,7 +106,7 @@ class QuizServiceSupabase {
   /**
    * Add a question to a quiz
    */
-  static async addQuestion(quizId, { question, options, correctAnswer, difficulty, points }) {
+  static async addQuestion(quizId, { question, options, correctAnswer, difficulty, points, question_type }) {
     // Get next order number
     const { data: questions } = await supabase
       .from('quiz_questions')
@@ -112,25 +117,34 @@ class QuizServiceSupabase {
 
     const nextOrder = (questions?.[0]?.order_num || 0) + 1;
 
+    // Build insert object - include question_type only if provided
+    const insertObj = {
+      quiz_id: quizId,
+      question,
+      options: options || [],
+      correct_answer: typeof correctAnswer === 'number' ? correctAnswer : 0,
+      difficulty,
+      order_num: nextOrder,
+    };
+
+    // Only add question_type if it's explicitly provided
+    if (question_type) {
+      insertObj.question_type = question_type;
+    }
+
     const { data, error } = await supabase
       .from('quiz_questions')
-      .insert([{
-        quiz_id: quizId,
-        question,
-        options: options || [],
-        correct_answer: typeof correctAnswer === 'number' ? correctAnswer : 0,
-        difficulty,
-        order_num: nextOrder,
-      }])
+      .insert([insertObj])
       .select();
 
     if (error) throw new Error(`Failed to add question: ${error.message}`);
     
-    // Add points to response
+    // Add points and normalize response
     const questionData = data?.[0];
     if (questionData) {
       questionData.points = points || 10;
       questionData.question_text = questionData.question;
+      questionData.question_type = questionData.question_type || 'multiple_choice';
     }
     return questionData;
   }

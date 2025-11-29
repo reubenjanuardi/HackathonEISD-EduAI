@@ -23,6 +23,7 @@ import {
   StudentClasses,
   StudentClassDetail,
   QuizTaker,
+  QuizResult,
   StudentProgress 
 } from './pages/student';
 
@@ -199,7 +200,7 @@ function App() {
             }
           />
           <Route
-            path="/student/quiz/:quizId"
+            path="/student/class/:classId/quiz/:quizId"
             element={
               <ProtectedRoute requiredRole="student">
                 <QuizTaker />
@@ -207,10 +208,10 @@ function App() {
             }
           />
           <Route
-            path="/student/quiz/:quizId/result"
+            path="/student/class/:classId/quiz/:quizId/result"
             element={
               <ProtectedRoute requiredRole="student">
-                <LegacyQuizResult />
+                <QuizResult />
               </ProtectedRoute>
             }
           />

@@ -14,6 +14,7 @@ import attemptRoutes from './routes/attemptRoutes.js';
 import analyticsRoutes from './routes/analyticsRoutes.js';
 import aiRoutes from './routes/aiRoutes.js';
 import exportRoutes from './routes/exportRoutes.js';
+import { ensureQuestionTypeColumn, ensureAnswerTextField } from './services/migrationService.js';
 
 // Get __dirname equivalent in ES modules
 const __filename = fileURLToPath(import.meta.url);
@@ -73,6 +74,18 @@ app.use((err, req, res, next) => {
 
 // Start server
 const startServer = async () => {
+  // Check database schema
+  console.log('\n🔍 Checking database schema...');
+  const hasQuestionType = await ensureQuestionTypeColumn();
+  const hasAnswerText = await ensureAnswerTextField();
+  
+  if (!hasQuestionType || !hasAnswerText) {
+    console.log('\n⚠️  DATABASE SCHEMA NEEDS MIGRATION');
+    console.log('Please execute the following SQL in your Supabase dashboard:');
+    console.log('   1. ALTER TABLE quiz_questions ADD COLUMN IF NOT EXISTS question_type TEXT DEFAULT \'multiple_choice\';');
+    console.log('   2. ALTER TABLE attempt_answers ADD COLUMN IF NOT EXISTS student_answer_text TEXT;');
+  }
+
   app.listen(PORT, () => {
     console.log(`\n🚀 EduAI Server running on port ${PORT}`);
     console.log(`📍 Health check: http://localhost:${PORT}/api/health`);
