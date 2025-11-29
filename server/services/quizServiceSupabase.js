@@ -144,7 +144,28 @@ class QuizServiceSupabase {
       is_published: quiz.published,
       time_limit: quiz.time_limit || 30,
       is_adaptive: quiz.is_adaptive || false,
-      questions: quiz.quiz_questions || []
+      questions: (quiz.quiz_questions || []).map(q => {
+        // Use stored question_type or detect from options
+        const qType = q.question_type || detectQuestionType(q.options);
+        const correctAnswerText = convertAnswerForDisplay(q.correct_answer, q.options, qType);
+        
+        // For short answer, hide options from display
+        let displayOptions = q.options || [];
+        if (qType === 'short_answer') {
+          displayOptions = [];
+        }
+        
+        return {
+          id: q.id,
+          question_text: q.question,
+          question_type: qType,
+          options: displayOptions,
+          correct_answer: correctAnswerText,
+          difficulty: q.difficulty || 'medium',
+          points: 10,
+          order_num: q.order_num
+        };
+      })
     }));
   }
 
@@ -171,19 +192,35 @@ class QuizServiceSupabase {
       is_published: data.published,
       time_limit: data.time_limit || 30,
       is_adaptive: data.is_adaptive || false,
-      questions: (data.quiz_questions || []).map(q => ({
-        ...q,
-        question_text: q.question,
-        question_type: 'multiple_choice', // Default type
-        points: 10 // Default points
-      }))
+      questions: (data.quiz_questions || []).map(q => {
+        // Use stored question_type or detect from options
+        const qType = q.question_type || detectQuestionType(q.options);
+        const correctAnswerText = convertAnswerForDisplay(q.correct_answer, q.options, qType);
+        
+        // For short answer, hide options from display
+        let displayOptions = q.options || [];
+        if (qType === 'short_answer') {
+          displayOptions = [];
+        }
+        
+        return {
+          id: q.id,
+          question_text: q.question,
+          question_type: qType,
+          options: displayOptions,
+          correct_answer: correctAnswerText,
+          difficulty: q.difficulty || 'medium',
+          points: 10,
+          order_num: q.order_num
+        };
+      })
     };
   }
 
   /**
    * Add a question to a quiz
    */
-  static async addQuestion(quizId, { question, options, correctAnswer, difficulty, points }) {
+  static async addQuestion(quizId, { question, question_type, options, correctAnswer, difficulty, points }) {
     // Get next order number
     const { data: questions } = await supabase
       .from('quiz_questions')
@@ -196,18 +233,17 @@ class QuizServiceSupabase {
     
     // Prepare options and correct answer based on question type
     const qType = question_type || 'multiple_choice';
-    console.log('[addQuestion] Input:', { question_type, qType, options, correctAnswer });
     const storageOptions = prepareOptionsForStorage(options, correctAnswer, qType);
     const storageAnswer = convertAnswerForStorage(correctAnswer, storageOptions, qType);
-    console.log('[addQuestion] Storage:', { storageOptions, storageAnswer });
 
     const { data, error } = await supabase
       .from('quiz_questions')
       .insert([{
         quiz_id: quizId,
         question,
-        options: options || [],
-        correct_answer: typeof correctAnswer === 'number' ? correctAnswer : 0,
+        question_type: qType,
+        options: storageOptions,
+        correct_answer: storageAnswer,
         difficulty,
         order_num: nextOrder,
       }])
@@ -218,8 +254,14 @@ class QuizServiceSupabase {
     // Add points to response
     const questionData = data?.[0];
     if (questionData) {
-      const detectedType = detectQuestionType(questionData.options);
       questionData.question_text = questionData.question;
+      questionData.points = points || 10;
+      // Convert correct answer back to display format
+      questionData.correct_answer = convertAnswerForDisplay(
+        questionData.correct_answer,
+        questionData.options,
+        qType
+      );
     }
     return questionData;
   }
