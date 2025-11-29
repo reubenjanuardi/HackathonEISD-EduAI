@@ -144,29 +144,7 @@ class QuizServiceSupabase {
       is_published: quiz.published,
       time_limit: quiz.time_limit || 30,
       is_adaptive: quiz.is_adaptive || false,
-      questions: (quiz.quiz_questions || []).map(q => {
-        // Filter out empty options before detecting type
-        const cleanOptions = (q.options || []).filter(o => o && String(o).trim());
-        const questionType = detectQuestionType(cleanOptions);
-        const correctAnswerText = convertAnswerForDisplay(q.correct_answer, cleanOptions, questionType);
-        
-        // For display, hide the answer from options for short answer
-        let displayOptions = cleanOptions;
-        if (questionType === 'short_answer') {
-          displayOptions = [];
-        }
-        
-        return {
-          id: q.id,
-          question_text: q.question,
-          question_type: questionType,
-          options: displayOptions,
-          correct_answer: correctAnswerText,
-          difficulty: q.difficulty || 'medium',
-          points: 10,
-          order_num: q.order_num
-        };
-      })
+      questions: quiz.quiz_questions || []
     }));
   }
 
@@ -193,35 +171,19 @@ class QuizServiceSupabase {
       is_published: data.published,
       time_limit: data.time_limit || 30,
       is_adaptive: data.is_adaptive || false,
-      questions: (data.quiz_questions || []).map(q => {
-        // Filter out empty options before detecting type
-        const cleanOptions = (q.options || []).filter(o => o && String(o).trim());
-        const questionType = detectQuestionType(cleanOptions);
-        const correctAnswerText = convertAnswerForDisplay(q.correct_answer, cleanOptions, questionType);
-        
-        let displayOptions = cleanOptions;
-        if (questionType === 'short_answer') {
-          displayOptions = [];
-        }
-        
-        return {
-          id: q.id,
-          question_text: q.question,
-          question_type: questionType,
-          options: displayOptions,
-          correct_answer: correctAnswerText,
-          difficulty: q.difficulty || 'medium',
-          points: 10,
-          order_num: q.order_num
-        };
-      })
+      questions: (data.quiz_questions || []).map(q => ({
+        ...q,
+        question_text: q.question,
+        question_type: 'multiple_choice', // Default type
+        points: 10 // Default points
+      }))
     };
   }
 
   /**
    * Add a question to a quiz
    */
-  static async addQuestion(quizId, { question, question_type, options, correctAnswer, difficulty, points }) {
+  static async addQuestion(quizId, { question, options, correctAnswer, difficulty, points }) {
     // Get next order number
     const { data: questions } = await supabase
       .from('quiz_questions')
@@ -244,31 +206,20 @@ class QuizServiceSupabase {
       .insert([{
         quiz_id: quizId,
         question,
-        options: storageOptions,
-        correct_answer: storageAnswer,
-        difficulty: difficulty || 'medium',
+        options: options || [],
+        correct_answer: typeof correctAnswer === 'number' ? correctAnswer : 0,
+        difficulty,
         order_num: nextOrder,
       }])
       .select();
 
     if (error) throw new Error(`Failed to add question: ${error.message}`);
     
+    // Add points to response
     const questionData = data?.[0];
     if (questionData) {
       const detectedType = detectQuestionType(questionData.options);
       questionData.question_text = questionData.question;
-      questionData.question_type = detectedType;
-      questionData.points = points || 10;
-      questionData.correct_answer = convertAnswerForDisplay(
-        questionData.correct_answer, 
-        questionData.options, 
-        detectedType
-      );
-      
-      // Hide options for short answer display
-      if (detectedType === 'short_answer') {
-        questionData.options = [];
-      }
     }
     return questionData;
   }

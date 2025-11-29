@@ -269,10 +269,10 @@ const ClassDetail = () => {
             ) : (
               <Table
                 columns={[
-                  { key: 'name', header: 'Name' },
-                  { key: 'email', header: 'Email' },
-                  { key: 'enrolled_at', header: 'Enrolled' },
-                  { key: 'actions', header: '' }
+                  { header: 'Name', accessor: 'name' },
+                  { header: 'Email', accessor: 'email' },
+                  { header: 'Enrolled', accessor: 'enrolled_at' },
+                  { header: '', accessor: 'actions' }
                 ]}
                 data={enrollments.map((enrollment) => ({
                   name: enrollment.profiles?.name || 'Unknown',

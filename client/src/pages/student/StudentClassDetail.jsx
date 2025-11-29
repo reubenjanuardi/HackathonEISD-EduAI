@@ -239,7 +239,7 @@ const StudentClassDetail = () => {
                         </div>
                       </div>
 
-                      <Link to={`/student/quiz/${quiz.id}`}>
+                      <Link to={`/student/class/${id}/quiz/${quiz.id}`}>
                         <Button variant="primary">
                           Start Quiz
                         </Button>
