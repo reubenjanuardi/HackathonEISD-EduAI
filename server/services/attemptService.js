@@ -32,15 +32,24 @@ class AttemptService {
   /**
    * Submit an answer to a question
    */
-  static async submitAnswer(attemptId, questionId, studentAnswer, correct) {
+  static async submitAnswer(attemptId, questionId, studentAnswer) {
+    // Handle both numeric (multiple choice) and text (short answer, true/false) answers
+    const insertData = {
+      attempt_id: attemptId,
+      question_id: questionId,
+    };
+
+    // If answer is a number, store as student_answer (for multiple choice)
+    // If answer is text, store as student_answer_text (for short answer/true false)
+    if (typeof studentAnswer === 'number') {
+      insertData.student_answer = studentAnswer;
+    } else {
+      insertData.student_answer_text = String(studentAnswer);
+    }
+
     const { data, error } = await supabase
       .from('attempt_answers')
-      .insert([{
-        attempt_id: attemptId,
-        question_id: questionId,
-        student_answer: studentAnswer,
-        correct,
-      }])
+      .insert([insertData])
       .select();
 
     if (error) throw new Error(`Failed to submit answer: ${error.message}`);

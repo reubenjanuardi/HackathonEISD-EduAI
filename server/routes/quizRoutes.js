@@ -122,7 +122,8 @@ router.post('/:id/questions', async (req, res) => {
       options, 
       correctAnswer, correct_answer,
       difficulty,
-      points
+      points,
+      question_type
     } = req.body;
 
     const questionText = question || question_text;
@@ -141,6 +142,7 @@ router.post('/:id/questions', async (req, res) => {
       correctAnswer: answer,
       difficulty,
       points: points || 10,
+      question_type: question_type || 'multiple_choice',
     });
 
     res.json({ success: true, data: newQuestion });
