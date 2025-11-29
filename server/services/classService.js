@@ -99,21 +99,24 @@ class ClassService {
 
     if (classError) throw new Error(`Failed to fetch class: ${classError.message}`);
     
-    // Then, get class members with their user info separately
+    // Get class members - DON'T filter by status to ensure we get all members
     const { data: members, error: membersError } = await supabase
       .from('class_members')
       .select('id, student_id, status, joined_at')
-      .eq('class_id', classId)
-      .eq('status', 'active');
+      .eq('class_id', classId);
 
     if (membersError) {
       console.error('Failed to fetch class members:', membersError.message);
     }
 
+    console.log(`[ClassDetail] Found ${members?.length || 0} members in class ${classId}`);
+
     // Get user details for each member
     const enrollments = [];
     if (members && members.length > 0) {
       const studentIds = members.map(m => m.student_id);
+      console.log(`[ClassDetail] Fetching user details for ${studentIds.length} students`);
+      
       const { data: users, error: usersError } = await supabase
         .from('users')
         .select('id, name, email')
@@ -122,6 +125,8 @@ class ClassService {
       if (usersError) {
         console.error('Failed to fetch user details:', usersError.message);
       }
+
+      console.log(`[ClassDetail] Found ${users?.length || 0} user records`);
 
       // Create a map for quick lookup
       const userMap = new Map((users || []).map(u => [u.id, u]));
@@ -138,6 +143,8 @@ class ClassService {
         });
       }
     }
+
+    console.log(`[ClassDetail] Built ${enrollments.length} enrollments`);
     
     // Parse metadata from description
     let subject = 'General';
