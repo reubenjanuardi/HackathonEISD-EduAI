@@ -56,10 +56,10 @@ class AIService {
         .from('quizzes')
         .insert({
           class_id: classId,
-          teacher_id: teacherId,
+          created_by: teacherId,
           title: `AI Generated: ${material.title}`,
           description: `Automatically generated from material: ${material.title}`,
-          is_published: false,
+          published: false,
           created_at: new Date().toISOString(),
         })
         .select()
@@ -69,6 +69,7 @@ class AIService {
 
       // Add questions to quiz
       const questions = [];
+      let orderNum = 1;
       for (const q of generatedQuestions) {
         const { data: question, error: qError } = await supabase
           .from('quiz_questions')
@@ -77,7 +78,8 @@ class AIService {
             question: q.question,
             options: q.options,
             correct_answer: q.correctAnswer,
-            difficulty: q.difficulty,
+            difficulty: q.difficulty || difficulty,
+            order_num: orderNum++,
             created_at: new Date().toISOString(),
           })
           .select()
@@ -363,10 +365,10 @@ class AIService {
         .from('quizzes')
         .insert({
           class_id: classId,
-          teacher_id: progress.teacher_id,
+          created_by: progress.teacher_id || studentId, // Use teacher_id from progress or student
           title: `Adaptive Quiz - ${topicId}`,
           description: `Adaptive quiz generated based on your performance`,
-          is_published: false,
+          published: false,
           created_at: new Date().toISOString(),
         })
         .select()
@@ -411,6 +413,7 @@ class AIService {
 
       // Add questions to quiz
       const questions = [];
+      let orderNum = 1;
       for (const q of generatedQuestions) {
         const { data: question, error: qError } = await supabase
           .from('quiz_questions')
@@ -419,7 +422,8 @@ class AIService {
             question: q.question,
             options: q.options,
             correct_answer: q.correctAnswer,
-            difficulty: q.difficulty,
+            difficulty: q.difficulty || difficulty,
+            order_num: orderNum++,
             created_at: new Date().toISOString(),
           })
           .select()

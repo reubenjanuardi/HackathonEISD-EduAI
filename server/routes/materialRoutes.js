@@ -32,13 +32,23 @@ router.post('/upload', upload.single('file'), async (req, res) => {
     }
 
     let fileUrl = null;
-    let fileType = 'document';
+    let fileType = 'text'; // Default type that matches DB constraint
     let materialTitle = title;
     
     if (req.file) {
       // Try to upload file, but don't fail if storage bucket doesn't exist
       fileUrl = await MaterialService.uploadFile(classId, req.file, 'document');
-      fileType = req.file.mimetype || 'document';
+      
+      // Map mimetype to valid type ('pdf', 'video', 'link', 'text')
+      const mimetype = req.file.mimetype || '';
+      if (mimetype.includes('pdf')) {
+        fileType = 'pdf';
+      } else if (mimetype.includes('video')) {
+        fileType = 'video';
+      } else {
+        fileType = 'text'; // Default for documents, images, etc.
+      }
+      
       // Use filename as title if not provided
       if (!materialTitle) {
         materialTitle = req.file.originalname.replace(/\.[^/.]+$/, '');
