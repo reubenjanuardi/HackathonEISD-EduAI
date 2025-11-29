@@ -7,7 +7,7 @@ import { useToast } from '../../components/Toast';
 import { useQuizStore } from '../../stores';
 
 const QuizTaker = () => {
-  const { quizId } = useParams();
+  const { quizId, classId } = useParams();
   const navigate = useNavigate();
   const { addToast } = useToast();
   const { 
@@ -39,6 +39,15 @@ const QuizTaker = () => {
     }
   }, [currentQuiz]);
 
+  // Update selectedAnswer when currentQuestionIndex changes
+  useEffect(() => {
+    const questions = currentQuiz?.questions || [];
+    const currentQ = questions[currentQuestionIndex];
+    if (currentQ) {
+      setSelectedAnswer(answers[currentQ.id] || '');
+    }
+  }, [currentQuestionIndex, currentQuiz, answers]);
+
   useEffect(() => {
     // Timer countdown
     if (timeLeft === null || timeLeft <= 0) return;
@@ -58,34 +67,66 @@ const QuizTaker = () => {
   }, [timeLeft]);
 
   const handleStartAttempt = async () => {
-    const attempt = await startAttempt(quizId);
-    if (attempt && currentQuiz) {
+    if (!quizId || !classId) {
+      addToast('Quiz or class information missing', 'error');
+      return;
+    }
+    const attempt = await startAttempt(quizId, classId);
+    if (attempt?.success && currentQuiz) {
       setTimeLeft(currentQuiz.time_limit * 60);
+    } else {
+      addToast('Failed to start quiz attempt', 'error');
     }
   };
 
   const handleAnswerSelect = (answer) => {
+    const questions = currentQuiz?.questions || [];
+    const currentQ = questions[currentQuestionIndex];
+    if (!currentQ) return;
+
     setSelectedAnswer(answer);
     setAnswers((prev) => ({
       ...prev,
-      [currentQuestion.id]: answer
+      [currentQ.id]: answer
     }));
   };
 
   const handleNext = async () => {
-    if (!selectedAnswer || !currentAttempt || !currentQuestion) return;
+    const questions = currentQuiz?.questions || [];
+    const currentQ = questions[currentQuestionIndex];
+    
+    if (!currentAttempt || !currentQ) {
+      addToast('Error loading question', 'error');
+      return;
+    }
+
+    // Don't require answer, but warn if empty
+    if (!selectedAnswer) {
+      addToast('Please answer the question before moving forward', 'warning');
+      return;
+    }
 
     setSubmitting(true);
     try {
-      await submitAnswer(currentAttempt.id, currentQuestion.id, selectedAnswer);
+      // Submit the current answer
+      const result = await submitAnswer(currentQ.id, selectedAnswer);
       
+      if (!result?.success) {
+        addToast('Failed to save answer', 'error');
+        setSubmitting(false);
+        return;
+      }
+      
+      // Check if there are more questions
       if (currentQuestionIndex < questions.length - 1) {
-        setCurrentQuestionIndex((prev) => prev + 1);
-        setSelectedAnswer(answers[questions[currentQuestionIndex + 1]?.id] || '');
+        // Move to next question - the useEffect will handle loading the answer
+        setCurrentQuestionIndex(currentQuestionIndex + 1);
       } else {
-        handleFinish();
+        // Last question answered, finish the quiz
+        await handleFinish();
       }
     } catch (err) {
+      console.error('Error submitting answer:', err);
       addToast('Failed to submit answer', 'error');
     } finally {
       setSubmitting(false);
@@ -94,24 +135,31 @@ const QuizTaker = () => {
 
   const handlePrevious = () => {
     if (currentQuestionIndex > 0) {
-      setCurrentQuestionIndex((prev) => prev - 1);
-      setSelectedAnswer(answers[questions[currentQuestionIndex - 1]?.id] || '');
+      // Move to previous question - the useEffect will handle loading the answer
+      setCurrentQuestionIndex(currentQuestionIndex - 1);
     }
   };
 
   const handleFinish = async () => {
-    if (!currentAttempt) return;
+    if (!currentAttempt) {
+      addToast('Error: No active quiz attempt', 'error');
+      return;
+    }
 
     setSubmitting(true);
     try {
-      const result = await completeAttempt(currentAttempt.id);
-      if (result) {
-        navigate(`/student/quiz/${quizId}/result`, { 
-          state: { attempt: result } 
+      const result = await completeAttempt();
+      if (result?.success) {
+        addToast('Quiz completed!', 'success');
+        navigate(`/student/class/${classId}/quiz/${quizId}/result`, { 
+          state: { attempt: result.data } 
         });
+      } else {
+        addToast('Failed to complete quiz: ' + (result?.error || 'Unknown error'), 'error');
       }
     } catch (err) {
-      addToast('Failed to complete quiz', 'error');
+      console.error('Error completing quiz:', err);
+      addToast('Failed to complete quiz: ' + err.message, 'error');
     } finally {
       setSubmitting(false);
     }
@@ -123,10 +171,29 @@ const QuizTaker = () => {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
+  // Debug: Check if params are available
+  if (!quizId || !classId) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-neutral-900 via-neutral-800 to-neutral-900">
+        <Navbar />
+        <div className="flex items-center justify-center h-[calc(100vh-64px)]">
+          <Card className="text-center py-8">
+            <p className="text-red-400 font-semibold mb-2">Error: Missing Parameters</p>
+            <p className="text-neutral-400 mb-2">Quiz ID: {quizId || 'NOT PROVIDED'}</p>
+            <p className="text-neutral-400 mb-4">Class ID: {classId || 'NOT PROVIDED'}</p>
+            <Link to="/student/dashboard" className="text-primary hover:underline inline-block">
+              Back to Dashboard
+            </Link>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
   if (loading && !currentQuiz) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-neutral-900 via-neutral-800 to-neutral-900">
-        <Navbar showBack backTo="/student/classes" backLabel="Classes" />
+        <Navbar showBack backTo={`/student/class/${classId}`} backLabel="Back to Class" />
         <div className="flex items-center justify-center h-[calc(100vh-64px)]">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
         </div>
@@ -137,7 +204,7 @@ const QuizTaker = () => {
   if (!currentQuiz) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-neutral-900 via-neutral-800 to-neutral-900">
-        <Navbar showBack backTo="/student/classes" backLabel="Classes" />
+        <Navbar showBack backTo={`/student/class/${classId}`} backLabel="Back to Class" />
         <div className="flex items-center justify-center h-[calc(100vh-64px)]">
           <Card className="text-center py-8">
             <p className="text-neutral-400">Quiz not found</p>
@@ -172,7 +239,7 @@ const QuizTaker = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-neutral-900 via-neutral-800 to-neutral-900">
-      <Navbar showBack backTo="/student/classes" backLabel="Classes" />
+      <Navbar showBack backTo={`/student/class/${classId}`} backLabel="Back to Class" />
       
       <div className="p-6">
         <div className="max-w-3xl mx-auto">
@@ -291,19 +358,19 @@ const QuizTaker = () => {
           </Button>
 
           <div className="flex gap-2">
-            {questions.map((_, idx) => (
+            {questions.map((q, idx) => (
               <button
                 key={idx}
                 className={`w-8 h-8 rounded-full text-sm font-medium transition-all ${
                   idx === currentQuestionIndex
                     ? 'bg-primary text-white'
-                    : answers[questions[idx]?.id]
+                    : answers[q?.id]
                     ? 'bg-green-500/20 text-green-400 border border-green-500/50'
                     : 'bg-neutral-700 text-neutral-400'
                 }`}
                 onClick={() => {
                   setCurrentQuestionIndex(idx);
-                  setSelectedAnswer(answers[questions[idx]?.id] || '');
+                  setSelectedAnswer(answers[q?.id] || '');
                 }}
               >
                 {idx + 1}
@@ -316,7 +383,7 @@ const QuizTaker = () => {
               variant="primary"
               onClick={handleFinish}
               loading={submitting}
-              disabled={!selectedAnswer}
+              disabled={submitting}
             >
               Finish Quiz
             </Button>
@@ -325,7 +392,7 @@ const QuizTaker = () => {
               variant="primary"
               onClick={handleNext}
               loading={submitting}
-              disabled={!selectedAnswer}
+              disabled={submitting}
             >
               Next
               <svg className="w-5 h-5 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">

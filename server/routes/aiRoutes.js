@@ -16,18 +16,57 @@ router.post('/generate-quiz', async (req, res) => {
   try {
     const { materialId, classId, numQuestions = 10, difficulty = 'medium' } = req.body;
 
-    if (!materialId || !classId) {
-      return res.status(400).json({ success: false, message: 'materialId and classId are required' });
+    if (!classId) {
+      return res.status(400).json({ success: false, message: 'classId is required' });
     }
 
+    if (!materialId) {
+      return res.status(400).json({ success: false, message: 'materialId is required' });
+    }
+
+    // Validate difficulty
+    const validDifficulties = ['easy', 'medium', 'hard'];
+    const normalizedDifficulty = validDifficulties.includes(difficulty.toLowerCase()) 
+      ? difficulty.toLowerCase() 
+      : 'medium';
+
+    // Validate numQuestions (1-20)
+    const questionCount = Math.min(Math.max(parseInt(numQuestions) || 10, 1), 20);
+
     const quiz = await AIService.generateQuizFromMaterial(materialId, classId, req.user.id, {
-      numQuestions,
-      difficulty,
+      numQuestions: questionCount,
+      difficulty: normalizedDifficulty,
     });
 
     res.json({ success: true, data: quiz });
   } catch (error) {
     console.error('Generate quiz error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+/**
+ * POST /api/ai/generate-quiz-from-text
+ * Generate quiz questions from raw text content
+ * Body: { classId, content, title, numQuestions, difficulty }
+ */
+router.post('/generate-quiz-from-text', async (req, res) => {
+  try {
+    const { classId, content, title = 'Custom Quiz', numQuestions = 10, difficulty = 'medium' } = req.body;
+
+    if (!classId || !content) {
+      return res.status(400).json({ success: false, message: 'classId and content are required' });
+    }
+
+    const quiz = await AIService.generateQuizFromText(classId, req.user.id, content, {
+      title,
+      numQuestions: Math.min(Math.max(parseInt(numQuestions) || 10, 1), 20),
+      difficulty: ['easy', 'medium', 'hard'].includes(difficulty) ? difficulty : 'medium',
+    });
+
+    res.json({ success: true, data: quiz });
+  } catch (error) {
+    console.error('Generate quiz from text error:', error);
     res.status(500).json({ success: false, message: error.message });
   }
 });
@@ -45,8 +84,8 @@ router.post('/summarize-material', async (req, res) => {
       return res.status(400).json({ success: false, message: 'materialId is required' });
     }
 
-    const summary = await AIService.summarizeMaterial(materialId);
-    res.json({ success: true, data: summary });
+    const result = await AIService.summarizeMaterial(materialId);
+    res.json({ success: true, data: result });
   } catch (error) {
     console.error('Summarize material error:', error);
     res.status(500).json({ success: false, message: error.message });
@@ -100,6 +139,44 @@ router.post('/generate-adaptive-quiz', async (req, res) => {
     res.json({ success: true, data: quiz });
   } catch (error) {
     console.error('Generate adaptive quiz error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+/**
+ * GET /api/ai/quiz-difficulty/:quizId
+ * Analyze quiz difficulty based on student attempts
+ */
+router.get('/quiz-difficulty/:quizId', async (req, res) => {
+  try {
+    const analysis = await AIService.analyzeQuizDifficulty(req.params.quizId);
+    res.json({ success: true, data: analysis });
+  } catch (error) {
+    console.error('Analyze quiz difficulty error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+/**
+ * GET /api/ai/health
+ * Check if AI service is configured and working
+ */
+router.get('/health', async (req, res) => {
+  try {
+    const hasApiKey = !!process.env.AIML_API_KEY;
+    const keyPreview = hasApiKey 
+      ? `${process.env.AIML_API_KEY.slice(0, 8)}...` 
+      : 'NOT SET';
+
+    res.json({ 
+      success: true, 
+      data: {
+        configured: hasApiKey,
+        apiKeyPreview: keyPreview,
+        status: hasApiKey ? 'ready' : 'missing_api_key',
+      }
+    });
+  } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
 });

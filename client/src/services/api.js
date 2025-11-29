@@ -134,13 +134,24 @@ export const analyticsAPI = {
 // AI API
 // ============================================
 export const aiAPI = {
+  // Quiz Generation
   generateQuiz: (materialId, classId, options = {}) => 
     api.post('/ai/generate-quiz', { materialId, classId, ...options }),
-  summarizeMaterial: (materialId) => api.post('/ai/summarize-material', { materialId }),
-  getInsights: (classId) => api.get(`/ai/insights/${classId}`),
-  getRecommendations: (classId) => api.get(`/ai/student-recommendations/${classId}`),
+  generateQuizFromText: (classId, content, options = {}) =>
+    api.post('/ai/generate-quiz-from-text', { classId, content, ...options }),
   generateAdaptiveQuiz: (classId, topicId) => 
     api.post('/ai/generate-adaptive-quiz', { classId, topicId }),
+  
+  // Material Summarization
+  summarizeMaterial: (materialId) => api.post('/ai/summarize-material', { materialId }),
+  
+  // Insights & Analytics
+  getInsights: (classId) => api.get(`/ai/insights/${classId}`),
+  getRecommendations: (classId) => api.get(`/ai/student-recommendations/${classId}`),
+  analyzeQuizDifficulty: (quizId) => api.get(`/ai/quiz-difficulty/${quizId}`),
+  
+  // Health Check
+  checkHealth: () => api.get('/ai/health'),
 };
 
 // ============================================
@@ -304,7 +315,31 @@ export const getStudentProgress = async () => {
 
 // AI
 export const generateQuiz = async (options) => {
-  const response = await aiAPI.generateQuiz(options.materialId, options.classId, options);
+  // If materialId is provided, use material-based generation
+  if (options.materialId) {
+    const response = await aiAPI.generateQuiz(options.materialId, options.classId, {
+      numQuestions: options.numQuestions,
+      difficulty: options.difficulty,
+    });
+    return response.data;
+  }
+  
+  // Otherwise, use text/topic-based generation
+  const response = await aiAPI.generateQuizFromText(options.classId, options.topic || options.content, {
+    title: options.title || `Quiz on ${options.topic}`,
+    numQuestions: options.numQuestions,
+    difficulty: options.difficulty,
+  });
+  return response.data;
+};
+
+export const getAIInsights = async (classId) => {
+  const response = await aiAPI.getInsights(classId);
+  return response.data;
+};
+
+export const getAIRecommendations = async (classId) => {
+  const response = await aiAPI.getRecommendations(classId);
   return response.data;
 };
 
