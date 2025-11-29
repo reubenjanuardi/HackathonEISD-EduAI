@@ -19,6 +19,8 @@ const QuizBuilder = () => {
     fetchQuizzes, 
     createQuiz, 
     addQuestion,
+    updateQuestion,
+    deleteQuestion,
     publishQuiz,
     loading 
   } = useQuizStore();
@@ -27,7 +29,11 @@ const QuizBuilder = () => {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showAIModal, setShowAIModal] = useState(false);
   const [showQuestionModal, setShowQuestionModal] = useState(false);
+  const [showEditQuestionModal, setShowEditQuestionModal] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [selectedQuiz, setSelectedQuiz] = useState(null);
+  const [selectedQuestion, setSelectedQuestion] = useState(null);
+  const [expandedQuizId, setExpandedQuizId] = useState(null);
   const [generating, setGenerating] = useState(false);
 
   const [quizForm, setQuizForm] = useState({
@@ -149,6 +155,74 @@ const QuizBuilder = () => {
     setShowQuestionModal(true);
   };
 
+  const openEditQuestion = (quiz, question) => {
+    setSelectedQuiz(quiz);
+    setSelectedQuestion(question);
+    setQuestionForm({
+      question_text: question.question_text || '',
+      question_type: question.question_type || 'multiple_choice',
+      options: question.options || ['', '', '', ''],
+      correct_answer: question.correct_answer || '',
+      points: question.points || 10,
+      difficulty: question.difficulty || 'medium'
+    });
+    setShowEditQuestionModal(true);
+  };
+
+  const openDeleteConfirm = (quiz, question) => {
+    setSelectedQuiz(quiz);
+    setSelectedQuestion(question);
+    setShowDeleteConfirm(true);
+  };
+
+  const handleEditQuestion = async (e) => {
+    e.preventDefault();
+    if (!selectedQuestion) return;
+
+    const questionData = {
+      ...questionForm,
+      options: questionForm.question_type === 'multiple_choice' 
+        ? questionForm.options.filter(o => o.trim()) 
+        : undefined
+    };
+
+    const result = await updateQuestion(selectedQuestion.id, questionData);
+    if (result.success) {
+      addToast('Question updated!', 'success');
+      setShowEditQuestionModal(false);
+      setSelectedQuestion(null);
+      setQuestionForm({
+        question_text: '',
+        question_type: 'multiple_choice',
+        options: ['', '', '', ''],
+        correct_answer: '',
+        points: 10,
+        difficulty: 'medium'
+      });
+      fetchQuizzes(classId);
+    } else {
+      addToast('Failed to update question', 'error');
+    }
+  };
+
+  const handleDeleteQuestion = async () => {
+    if (!selectedQuestion) return;
+
+    const result = await deleteQuestion(selectedQuestion.id);
+    if (result.success) {
+      addToast('Question deleted!', 'success');
+      setShowDeleteConfirm(false);
+      setSelectedQuestion(null);
+      fetchQuizzes(classId);
+    } else {
+      addToast('Failed to delete question', 'error');
+    }
+  };
+
+  const toggleExpandQuiz = (quizId) => {
+    setExpandedQuizId(expandedQuizId === quizId ? null : quizId);
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-neutral-900 via-neutral-800 to-neutral-900">
       <Navbar 
@@ -253,30 +327,142 @@ const QuizBuilder = () => {
                 {/* Questions Preview */}
                 {quiz.questions && quiz.questions.length > 0 && (
                   <div className="mt-6 pt-6 border-t border-neutral-700">
-                    <h4 className="text-sm font-medium text-neutral-400 mb-3">Questions</h4>
-                    <div className="space-y-2">
-                      {quiz.questions.slice(0, 3).map((q, idx) => (
-                        <div key={q.id} className="flex items-center gap-3 p-3 bg-neutral-700/50 rounded-lg">
-                          <span className="w-6 h-6 flex items-center justify-center bg-neutral-600 rounded text-xs text-white">
-                            {idx + 1}
-                          </span>
-                          <span className="text-neutral-300 text-sm flex-1 truncate">
-                            {q.question_text}
-                          </span>
-                          <span className={`px-2 py-0.5 text-xs rounded ${
-                            q.difficulty === 'easy' ? 'bg-green-500/20 text-green-400' :
-                            q.difficulty === 'hard' ? 'bg-red-500/20 text-red-400' :
-                            'bg-yellow-500/20 text-yellow-400'
-                          }`}>
-                            {q.difficulty}
-                          </span>
-                          <span className="text-neutral-500 text-xs">{q.points} pts</span>
+                    <div className="flex items-center justify-between mb-4">
+                      <h4 className="text-sm font-medium text-neutral-400">Questions ({quiz.questions.length})</h4>
+                      <button
+                        onClick={() => toggleExpandQuiz(quiz.id)}
+                        className="text-sm text-primary hover:text-primary/80 flex items-center gap-1"
+                      >
+                        {expandedQuizId === quiz.id ? (
+                          <>
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                            </svg>
+                            Collapse
+                          </>
+                        ) : (
+                          <>
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                            </svg>
+                            Expand All
+                          </>
+                        )}
+                      </button>
+                    </div>
+                    <div className="space-y-3">
+                      {(expandedQuizId === quiz.id ? quiz.questions : quiz.questions.slice(0, 3)).map((q, idx) => (
+                        <div key={q.id} className={`group p-4 bg-neutral-700/50 rounded-lg ${expandedQuizId === quiz.id ? 'border border-neutral-600' : ''} hover:bg-neutral-700/70 transition-colors`}>
+                          <div className="flex items-start gap-3">
+                            <span className="w-7 h-7 flex items-center justify-center bg-neutral-600 rounded text-sm text-white font-medium shrink-0">
+                              {idx + 1}
+                            </span>
+                            <div className="flex-1 min-w-0">
+                              <p className={`text-neutral-200 ${expandedQuizId === quiz.id ? '' : 'truncate'}`}>
+                                {q.question_text}
+                              </p>
+                              
+                              {/* Expanded View - Show options and correct answer */}
+                              {expandedQuizId === quiz.id && (
+                                <div className="mt-3 space-y-2">
+                                  {/* Question Type Badge */}
+                                  <div className="flex items-center gap-2 text-xs">
+                                    <span className="px-2 py-0.5 bg-blue-500/20 text-blue-400 rounded">
+                                      {q.question_type === 'multiple_choice' ? 'Multiple Choice' : 
+                                       q.question_type === 'true_false' ? 'True/False' : 'Short Answer'}
+                                    </span>
+                                  </div>
+                                  
+                                  {/* Options for multiple choice */}
+                                  {q.question_type === 'multiple_choice' && q.options && (
+                                    <div className="pl-4 space-y-1.5 mt-2">
+                                      {q.options.map((opt, optIdx) => (
+                                        <div 
+                                          key={optIdx} 
+                                          className={`flex items-center gap-2 text-sm p-2 rounded ${
+                                            opt === q.correct_answer 
+                                              ? 'bg-green-500/10 border border-green-500/30' 
+                                              : 'bg-neutral-800/50'
+                                          }`}
+                                        >
+                                          <span className="w-5 h-5 flex items-center justify-center bg-neutral-600 rounded-full text-xs">
+                                            {String.fromCharCode(65 + optIdx)}
+                                          </span>
+                                          <span className={opt === q.correct_answer ? 'text-green-400' : 'text-neutral-400'}>
+                                            {opt}
+                                          </span>
+                                          {opt === q.correct_answer && (
+                                            <svg className="w-4 h-4 text-green-400 ml-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                            </svg>
+                                          )}
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+                                  
+                                  {/* Correct answer for true/false or short answer */}
+                                  {q.question_type !== 'multiple_choice' && (
+                                    <div className="pl-4 mt-2">
+                                      <div className="flex items-center gap-2 text-sm p-2 rounded bg-green-500/10 border border-green-500/30">
+                                        <svg className="w-4 h-4 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                        </svg>
+                                        <span className="text-green-400">
+                                          Correct: {q.correct_answer}
+                                        </span>
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                            
+                            {/* Right side: badges and actions */}
+                            <div className="flex items-center gap-2 shrink-0">
+                              <span className={`px-2 py-0.5 text-xs rounded ${
+                                q.difficulty === 'easy' ? 'bg-green-500/20 text-green-400' :
+                                q.difficulty === 'hard' ? 'bg-red-500/20 text-red-400' :
+                                'bg-yellow-500/20 text-yellow-400'
+                              }`}>
+                                {q.difficulty}
+                              </span>
+                              <span className="text-neutral-500 text-xs">{q.points} pts</span>
+                              
+                              {/* Edit/Delete buttons - only show when expanded or on hover */}
+                              {!quiz.is_published && (
+                                <div className={`flex gap-1 ${expandedQuizId === quiz.id ? '' : 'opacity-0 group-hover:opacity-100'} transition-opacity`}>
+                                  <button
+                                    onClick={() => openEditQuestion(quiz, q)}
+                                    className="p-1.5 text-neutral-400 hover:text-blue-400 hover:bg-blue-500/10 rounded transition-colors"
+                                    title="Edit Question"
+                                  >
+                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                    </svg>
+                                  </button>
+                                  <button
+                                    onClick={() => openDeleteConfirm(quiz, q)}
+                                    className="p-1.5 text-neutral-400 hover:text-red-400 hover:bg-red-500/10 rounded transition-colors"
+                                    title="Delete Question"
+                                  >
+                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                    </svg>
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          </div>
                         </div>
                       ))}
-                      {quiz.questions.length > 3 && (
-                        <p className="text-sm text-neutral-500 text-center py-2">
-                          +{quiz.questions.length - 3} more questions
-                        </p>
+                      {expandedQuizId !== quiz.id && quiz.questions.length > 3 && (
+                        <button
+                          onClick={() => toggleExpandQuiz(quiz.id)}
+                          className="w-full text-sm text-neutral-500 hover:text-neutral-300 text-center py-2 hover:bg-neutral-700/30 rounded transition-colors"
+                        >
+                          +{quiz.questions.length - 3} more questions - Click to expand
+                        </button>
                       )}
                     </div>
                   </div>
@@ -586,6 +772,223 @@ const QuizBuilder = () => {
               </Button>
             </div>
           </form>
+        </Modal>
+
+        {/* Edit Question Modal */}
+        <Modal
+          isOpen={showEditQuestionModal}
+          onClose={() => {
+            setShowEditQuestionModal(false);
+            setSelectedQuestion(null);
+            setQuestionForm({
+              question_text: '',
+              question_type: 'multiple_choice',
+              options: ['', '', '', ''],
+              correct_answer: '',
+              points: 10,
+              difficulty: 'medium'
+            });
+          }}
+          title={`Edit Question`}
+        >
+          <form onSubmit={handleEditQuestion} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-neutral-300 mb-2">
+                Question Type
+              </label>
+              <select
+                className="w-full px-4 py-3 bg-neutral-700 border border-neutral-600 rounded-lg text-white focus:outline-none focus:border-primary"
+                value={questionForm.question_type}
+                onChange={(e) => setQuestionForm({ ...questionForm, question_type: e.target.value })}
+              >
+                <option value="multiple_choice">Multiple Choice</option>
+                <option value="true_false">True/False</option>
+                <option value="short_answer">Short Answer</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-neutral-300 mb-2">
+                Question
+              </label>
+              <textarea
+                className="w-full px-4 py-3 bg-neutral-700 border border-neutral-600 rounded-lg text-white placeholder-neutral-400 focus:outline-none focus:border-primary resize-none"
+                rows={3}
+                placeholder="Enter your question..."
+                value={questionForm.question_text}
+                onChange={(e) => setQuestionForm({ ...questionForm, question_text: e.target.value })}
+                required
+              />
+            </div>
+
+            {questionForm.question_type === 'multiple_choice' && (
+              <div>
+                <label className="block text-sm font-medium text-neutral-300 mb-2">
+                  Options
+                </label>
+                {questionForm.options.map((option, idx) => (
+                  <Input
+                    key={idx}
+                    placeholder={`Option ${idx + 1}`}
+                    value={option}
+                    onChange={(e) => {
+                      const newOptions = [...questionForm.options];
+                      newOptions[idx] = e.target.value;
+                      setQuestionForm({ ...questionForm, options: newOptions });
+                    }}
+                    className="mb-2"
+                  />
+                ))}
+              </div>
+            )}
+
+            {questionForm.question_type === 'true_false' && (
+              <div>
+                <label className="block text-sm font-medium text-neutral-300 mb-2">
+                  Correct Answer
+                </label>
+                <div className="flex gap-4">
+                  <label className="flex items-center gap-2 text-neutral-300">
+                    <input
+                      type="radio"
+                      name="editTrueFalse"
+                      value="true"
+                      checked={questionForm.correct_answer === 'true'}
+                      onChange={(e) => setQuestionForm({ ...questionForm, correct_answer: e.target.value })}
+                      className="text-primary focus:ring-primary"
+                    />
+                    True
+                  </label>
+                  <label className="flex items-center gap-2 text-neutral-300">
+                    <input
+                      type="radio"
+                      name="editTrueFalse"
+                      value="false"
+                      checked={questionForm.correct_answer === 'false'}
+                      onChange={(e) => setQuestionForm({ ...questionForm, correct_answer: e.target.value })}
+                      className="text-primary focus:ring-primary"
+                    />
+                    False
+                  </label>
+                </div>
+              </div>
+            )}
+
+            {questionForm.question_type !== 'true_false' && (
+              <Input
+                label="Correct Answer"
+                placeholder="Enter the correct answer"
+                value={questionForm.correct_answer}
+                onChange={(e) => setQuestionForm({ ...questionForm, correct_answer: e.target.value })}
+                required
+              />
+            )}
+
+            <div className="grid grid-cols-2 gap-4">
+              <Input
+                label="Points"
+                type="number"
+                min={1}
+                max={100}
+                value={questionForm.points}
+                onChange={(e) => setQuestionForm({ ...questionForm, points: parseInt(e.target.value) || 10 })}
+              />
+
+              <div>
+                <label className="block text-sm font-medium text-neutral-300 mb-2">
+                  Difficulty
+                </label>
+                <select
+                  className="w-full px-4 py-3 bg-neutral-700 border border-neutral-600 rounded-lg text-white focus:outline-none focus:border-primary"
+                  value={questionForm.difficulty}
+                  onChange={(e) => setQuestionForm({ ...questionForm, difficulty: e.target.value })}
+                >
+                  <option value="easy">Easy</option>
+                  <option value="medium">Medium</option>
+                  <option value="hard">Hard</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="flex gap-3 pt-4">
+              <Button
+                type="button"
+                variant="secondary"
+                className="flex-1"
+                onClick={() => {
+                  setShowEditQuestionModal(false);
+                  setSelectedQuestion(null);
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                variant="primary"
+                className="flex-1"
+                loading={loading}
+              >
+                Update Question
+              </Button>
+            </div>
+          </form>
+        </Modal>
+
+        {/* Delete Confirmation Modal */}
+        <Modal
+          isOpen={showDeleteConfirm}
+          onClose={() => {
+            setShowDeleteConfirm(false);
+            setSelectedQuestion(null);
+          }}
+          title="Delete Question"
+        >
+          <div className="space-y-4">
+            <div className="p-4 bg-red-500/10 border border-red-500/30 rounded-lg">
+              <div className="flex items-start gap-3">
+                <svg className="w-6 h-6 text-red-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+                <div>
+                  <h4 className="text-red-400 font-medium">Are you sure?</h4>
+                  <p className="text-neutral-400 text-sm mt-1">
+                    This action cannot be undone. The question will be permanently deleted.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {selectedQuestion && (
+              <div className="p-3 bg-neutral-700/50 rounded-lg">
+                <p className="text-neutral-300 text-sm">
+                  <strong>Question:</strong> {selectedQuestion.question_text}
+                </p>
+              </div>
+            )}
+
+            <div className="flex gap-3 pt-2">
+              <Button
+                type="button"
+                variant="secondary"
+                className="flex-1"
+                onClick={() => {
+                  setShowDeleteConfirm(false);
+                  setSelectedQuestion(null);
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                variant="primary"
+                className="flex-1 !bg-red-500 hover:!bg-red-600"
+                onClick={handleDeleteQuestion}
+                loading={loading}
+              >
+                Delete Question
+              </Button>
+            </div>
+          </div>
         </Modal>
         </div>
       </div>

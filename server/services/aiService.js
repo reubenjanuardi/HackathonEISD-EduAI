@@ -223,17 +223,46 @@ function parseAIJsonResponse(content, fallback = []) {
 
 /**
  * Normalize quiz questions to database format
+ * Converts correctAnswer index to actual answer text
  */
 function normalizeQuestions(questions, defaultDifficulty = 'medium') {
-  return questions.map((q, index) => ({
-    question: q.question || q.text || '',
-    options: Array.isArray(q.options) ? q.options : [],
-    correct_answer: typeof q.correctAnswer === 'number' ? q.correctAnswer : 
-                    typeof q.correct_answer === 'number' ? q.correct_answer :
-                    typeof q.answer === 'number' ? q.answer : 0,
-    difficulty: q.difficulty || defaultDifficulty,
-    order_num: index + 1,
-  }));
+  return questions.map((q, index) => {
+    const options = Array.isArray(q.options) ? q.options : [];
+    
+    // Get correct answer - could be index or text
+    let correctAnswer = '';
+    
+    // Check if correctAnswer is a number (index)
+    if (typeof q.correctAnswer === 'number' && options[q.correctAnswer]) {
+      correctAnswer = options[q.correctAnswer];
+    } else if (typeof q.correct_answer === 'number' && options[q.correct_answer]) {
+      correctAnswer = options[q.correct_answer];
+    } else if (typeof q.answer === 'number' && options[q.answer]) {
+      correctAnswer = options[q.answer];
+    } 
+    // Check if correctAnswer is already text
+    else if (typeof q.correctAnswer === 'string') {
+      correctAnswer = q.correctAnswer;
+    } else if (typeof q.correct_answer === 'string') {
+      correctAnswer = q.correct_answer;
+    } else if (typeof q.answer === 'string') {
+      correctAnswer = q.answer;
+    }
+    // Fallback to first option if nothing else works
+    else if (options.length > 0) {
+      correctAnswer = options[0];
+    }
+
+    return {
+      question: q.question || q.text || '',
+      question_type: q.question_type || 'multiple_choice',
+      options,
+      correct_answer: correctAnswer,
+      difficulty: q.difficulty || defaultDifficulty,
+      points: q.points || 10,
+      order_num: index + 1,
+    };
+  });
 }
 
 /**

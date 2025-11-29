@@ -119,6 +119,7 @@ router.post('/:id/questions', async (req, res) => {
     // Accept both naming conventions from frontend
     const { 
       question, question_text,
+      question_type,
       options, 
       correctAnswer, correct_answer,
       difficulty,
@@ -128,18 +129,19 @@ router.post('/:id/questions', async (req, res) => {
     const questionText = question || question_text;
     const answer = correctAnswer !== undefined ? correctAnswer : correct_answer;
 
-    if (!questionText || !difficulty) {
+    if (!questionText) {
       return res.status(400).json({ 
         success: false, 
-        message: 'question and difficulty are required' 
+        message: 'question text is required' 
       });
     }
 
     const newQuestion = await QuizServiceSupabase.addQuestion(req.params.id, {
       question: questionText,
+      question_type: question_type || 'multiple_choice',
       options: options || [],
       correctAnswer: answer,
-      difficulty,
+      difficulty: difficulty || 'medium',
       points: points || 10,
     });
 
