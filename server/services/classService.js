@@ -90,30 +90,62 @@ class ClassService {
    * Get a specific class with members
    */
   static async getClassDetail(classId) {
-    const { data, error } = await supabase
+    // First, get the class details
+    const { data: classData, error: classError } = await supabase
       .from('classes')
-      .select(`
-        *,
-        class_members (
-          id,
-          student_id,
-          status,
-          joined_at,
-          users:student_id (id, name, email)
-        )
-      `)
+      .select('*')
       .eq('id', classId)
       .single();
 
-    if (error) throw new Error(`Failed to fetch class: ${error.message}`);
+    if (classError) throw new Error(`Failed to fetch class: ${classError.message}`);
+    
+    // Then, get class members with their user info separately
+    const { data: members, error: membersError } = await supabase
+      .from('class_members')
+      .select('id, student_id, status, joined_at')
+      .eq('class_id', classId)
+      .eq('status', 'active');
+
+    if (membersError) {
+      console.error('Failed to fetch class members:', membersError.message);
+    }
+
+    // Get user details for each member
+    const enrollments = [];
+    if (members && members.length > 0) {
+      const studentIds = members.map(m => m.student_id);
+      const { data: users, error: usersError } = await supabase
+        .from('users')
+        .select('id, name, email')
+        .in('id', studentIds);
+
+      if (usersError) {
+        console.error('Failed to fetch user details:', usersError.message);
+      }
+
+      // Create a map for quick lookup
+      const userMap = new Map((users || []).map(u => [u.id, u]));
+
+      // Build enrollments array
+      for (const member of members) {
+        const user = userMap.get(member.student_id);
+        enrollments.push({
+          id: member.id,
+          student_id: member.student_id,
+          enrolled_at: member.joined_at,
+          status: member.status,
+          profiles: user || { id: member.student_id, name: 'User Not Found', email: '' }
+        });
+      }
+    }
     
     // Parse metadata from description
     let subject = 'General';
     let color = '#6366f1';
-    let description = data.description || '';
+    let description = classData.description || '';
     
     try {
-      const meta = JSON.parse(data.description);
+      const meta = JSON.parse(classData.description);
       subject = meta.subject || 'General';
       color = meta.color || '#6366f1';
       description = meta.description || '';
@@ -121,21 +153,12 @@ class ClassService {
       // description is not JSON, use as-is
     }
     
-    // Restructure enrollments for frontend
-    const enrollments = (data.class_members || []).map(member => ({
-      id: member.id,
-      student_id: member.student_id,
-      enrolled_at: member.joined_at,
-      status: member.status,
-      profiles: member.users
-    }));
-    
     return {
-      ...data,
+      ...classData,
       subject,
       color,
       description,
-      enrollment_code: data.class_code,
+      enrollment_code: classData.class_code,
       enrollments
     };
   }
